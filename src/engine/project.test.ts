@@ -112,10 +112,13 @@ describe('chartData', () => {
     const c = chartData(season, p.predicted, 'driver', ['ann', 'bob', 'zed']);
     expect(c.progression.map((r) => [r.label, r.predicted, r.ann, r[`ann${PRED}`]])).toEqual([
       ['R1', false, 25, undefined],
-      ['R2', false, 25, 25],
+      ['R2 S', false, 25, 25],
       ['R3', true, undefined, 43],
     ]);
     expect(c.progression[0]?.name).toBe('Alpha GP');
+    // Round 2 has only had its sprint: labelled so it isn't mistaken for the race result.
+    expect(c.progression[1]?.name).toBe('Beta GP (sprint only, race not run yet)');
+    expect(c.progression[2]?.name).toBe('Gamma GP');
     // zed never scored: zero everywhere.
     expect(c.progression[0]?.zed).toBe(0);
     expect(c.gap.map((r) => r.bob ?? r[`bob${PRED}`])).toEqual([7, 0, 17]);

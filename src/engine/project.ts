@@ -112,6 +112,7 @@ export const PRED = '~pred';
 interface RoundState {
   round: number;
   name: string;
+  sprintOnly: boolean;
   predicted: boolean;
   standings: Standing[];
   schedule: Weekend[];
@@ -131,6 +132,8 @@ function roundStates(season: SeasonData, predicted: Session[], mode: Mode): Roun
     return {
       round,
       name: season.schedule.find((w) => w.round === round)?.name ?? `Round ${round}`,
+      // Sprint run (or predicted) but the race not yet: the point shows standings after the sprint only.
+      sprintOnly: !these.some((s) => s.kind === 'race'),
       predicted: these.some((s) => s.predicted),
       standings,
       schedule: markDone(blank, seen),
@@ -145,7 +148,12 @@ function split(states: RoundState[], ids: string[], value: (st: RoundState, id: 
   // but only when there is something predicted after it.
   const firstPred = states.some((st) => st.predicted) ? Math.max(lastActual, 0) : states.length;
   return states.map((st, i) => {
-    const row: SeriesRow = { round: st.round, label: `R${st.round}`, name: st.name, predicted: st.predicted };
+    const row: SeriesRow = {
+      round: st.round,
+      label: st.sprintOnly ? `R${st.round} S` : `R${st.round}`,
+      name: st.sprintOnly ? `${st.name} (sprint only, race not run yet)` : st.name,
+      predicted: st.predicted,
+    };
     for (const id of ids) {
       const v = value(st, id);
       if (i <= lastActual) row[id] = v;
