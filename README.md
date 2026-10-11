@@ -48,7 +48,7 @@ src/
 - **Sprint weekends:** marked by the schedule's `Sprint` field, or by sprint results existing for that round.
 - **Driver → team:** taken from the driver's most recent result. This handles mid-season swaps; the standings list Lawson under `red_bull` last, but his latest result is with `rb`.
 - **Predictor grid:** the entrants of the most recent session, so replaced drivers don't appear in the dropdowns.
-- **Rate limits:** requests run one at a time with at least 300 ms between them (limit is 4 req/s). A cold load is about 9 requests. `staleTime` is 10 min, there is no refetch on window focus, and failures retry up to 3 times with exponential backoff. Zod shape errors are never retried, since retrying would only use up the hourly quota.
+- **Rate limits:** requests run one at a time with at least 300 ms between them (limit is 4 req/s). A cold load is about 9 requests. `staleTime` is 5 min. The app polls every 10 min while the tab is visible (matching Jolpica's 10-min CDN cache) and refetches when you return to the tab if the data is stale. A Refresh button is in the header. Failures retry up to 3 times with exponential backoff. Zod shape errors are never retried, since retrying would only use up the hourly quota.
 - **Off-season:** an empty schedule shows an "Off-season" state. A season with no results shows empty standings, charts and predictor states.
 
 ## Ambiguities and the choices made

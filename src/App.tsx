@@ -28,10 +28,15 @@ export function App() {
           F1 Championship Calculator
           {season.status === 'success' && <span className="ml-2 text-base font-normal opacity-70">{season.data.season}</span>}
         </h1>
-        {season.status === 'success' && season.isFetching && (
-          <span role="status" className="text-xs opacity-70">
-            Refreshing…
-          </span>
+        {season.status === 'success' && (
+          <div className="flex items-center gap-2 text-xs">
+            <span role="status" className="opacity-70">
+              {season.isFetching ? 'Refreshing…' : `Updated ${new Date(season.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`}
+            </span>
+            <button type="button" className="btn" onClick={season.refresh} disabled={season.isFetching}>
+              Refresh
+            </button>
+          </div>
         )}
       </header>
       <nav className="mb-4">

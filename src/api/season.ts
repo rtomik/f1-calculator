@@ -110,7 +110,7 @@ export const seasonQueries = [
 export type SeasonQuery =
   | { status: 'pending' }
   | { status: 'error'; error: Error; retry: () => void }
-  | { status: 'success'; data: SeasonData; isFetching: boolean };
+  | { status: 'success'; data: SeasonData; isFetching: boolean; updatedAt: number; refresh: () => void };
 
 type SeasonResults = [
   UseQueryResult<ScheduleResponse>,
@@ -140,6 +140,8 @@ function combine(qs: SeasonResults): SeasonQuery {
           sprints: sprints.data,
         }),
         isFetching: qs.some((q) => q.isFetching),
+        updatedAt: Math.min(...qs.map((q) => q.dataUpdatedAt)),
+        refresh: () => qs.forEach((q) => void q.refetch()),
       };
 }
 
