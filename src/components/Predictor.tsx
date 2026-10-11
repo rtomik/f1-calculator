@@ -1,7 +1,8 @@
-import { openSessions } from '../engine/championship';
+import { useMemo, useState, type DragEvent } from 'react';
+import { openSessions, swapSlots } from '../engine/championship';
 import { POINTS, sessionKey } from '../engine/rules';
 import type { SeasonData, SessionKind, Weekend } from '../engine/types';
-import type { Projection } from '../engine/project';
+import { previousOrder, standingsOrder, type Projection } from '../engine/project';
 import { usePredictions } from '../store';
 import { teamColor } from '../teamColors';
 import { EmptyState, fmt, Predicted, StatusBadge } from './ui';
@@ -23,8 +24,8 @@ export function Predictor({ season, projection }: { season: SeasonData; projecti
       <div className="min-w-0 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm opacity-80">
-            Pick who finishes in each points position. Picking a driver who is already placed moves them, so a driver can't hold two
-            positions. Anyone not placed counts as DNF / outside the points (0 pts).
+            Drag drivers onto finishing positions, or use the dropdowns. Drag one position onto another to swap them, or back to the
+            pool to remove. A driver can only hold one position; anyone not placed counts as DNF / outside the points (0 pts).
           </p>
           <button type="button" className="btn" onClick={resetAll} disabled={projection.predicted.length === 0}>
             Reset all
@@ -97,20 +98,96 @@ function WeekendCard({
   );
 }
 
+// Drag payload: "<sessionKey>|<from slot index, -1 = pool>|<driverId>".
+const DRAG_TYPE = 'text/plain';
+
 function SessionPicker({ round, kind, season }: { round: number; kind: SessionKind; season: SeasonData }) {
-  const order = usePredictions((s) => s.predictions[sessionKey(round, kind)]);
+  const key = sessionKey(round, kind);
+  const order = usePredictions((s) => s.predictions[key]);
+  const predictions = usePredictions((s) => s.predictions);
   const setSlot = usePredictions((s) => s.setSlot);
+  const setOrder = usePredictions((s) => s.setOrder);
+  const [over, setOver] = useState<number | 'pool' | null>(null);
+  const size = POINTS[kind].length;
   const drivers = season.entrants.flatMap((id) => season.drivers.filter((d) => d.id === id));
+  const byId = new Map(drivers.map((d) => [d.id, d]));
+  const unplaced = drivers.filter((d) => !order?.includes(d.id));
   const label = kind === 'race' ? 'Race' : 'Sprint';
+  const previous = useMemo(() => previousOrder(season, predictions, round, kind, size), [season, predictions, round, kind, size]);
+  const hasAny = order?.some((x) => x !== null) ?? false;
+
+  const startDrag = (e: DragEvent, from: number, driverId: string) => {
+    e.dataTransfer.setData(DRAG_TYPE, `${key}|${from}|${driverId}`);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+  // Anything else can be dropped here (e.g. selected text), so only accept known drivers.
+  const readDrag = (e: DragEvent) => {
+    const [fromKey, from, driverId] = e.dataTransfer.getData(DRAG_TYPE).split('|');
+    return driverId && byId.has(driverId) ? { sameSession: fromKey === key, from: Number(from), driverId } : null;
+  };
+  const dragOver = (e: DragEvent, target: number | 'pool') => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setOver(target);
+  };
+  const dropOnSlot = (e: DragEvent, i: number) => {
+    e.preventDefault();
+    setOver(null);
+    const drag = readDrag(e);
+    if (!drag) return;
+    if (drag.sameSession && drag.from >= 0) setOrder(round, kind, swapSlots(order ?? [], drag.from, i, size));
+    else setSlot(round, kind, i, drag.driverId);
+  };
+  const dropOnPool = (e: DragEvent) => {
+    e.preventDefault();
+    setOver(null);
+    const drag = readDrag(e);
+    if (drag?.sameSession && drag.from >= 0) setSlot(round, kind, drag.from, null);
+  };
+  const ring = (target: number | 'pool') => (over === target ? 'ring-2 ring-violet-500' : '');
+
   return (
     <fieldset>
       <legend className="mb-2 text-sm font-medium">{label}</legend>
-      <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3">
+      <div className="mb-2 flex flex-wrap gap-2">
+        <button type="button" className="btn" onClick={() => setOrder(round, kind, standingsOrder(season, size))}>
+          Current standings
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={previous === null}
+          onClick={() => previous && setOrder(round, kind, previous)}
+          title={previous === null ? `No earlier ${kind} this season` : `Copy the previous ${kind} (your prediction if you made one)`}
+        >
+          Previous {kind}
+        </button>
+        <button type="button" className="btn" disabled={!hasAny} onClick={() => setOrder(round, kind, [])}>
+          Clear
+        </button>
+      </div>
+      <ol className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 md:grid-cols-3">
         {POINTS[kind].map((pts, i) => {
           const id = `p-${round}-${kind}-${i}`;
+          const driver = order?.[i] ? byId.get(order[i]) : undefined;
           return (
-            <div key={i} className="flex items-center gap-2">
-              <label htmlFor={id} className="w-16 shrink-0 text-xs tabular-nums">
+            <li
+              key={i}
+              className={`flex items-center gap-1.5 rounded ${ring(i)}`}
+              onDragOver={(e) => dragOver(e, i)}
+              onDragLeave={() => setOver(null)}
+              onDrop={(e) => dropOnSlot(e, i)}
+            >
+              <span
+                draggable={driver !== undefined}
+                onDragStart={(e) => driver && startDrag(e, i, driver.id)}
+                onDragEnd={() => setOver(null)}
+                aria-hidden="true"
+                className={`w-3 shrink-0 text-center select-none ${driver ? 'cursor-grab opacity-60' : 'opacity-0'}`}
+              >
+                ⠿
+              </span>
+              <label htmlFor={id} className="w-14 shrink-0 text-xs tabular-nums">
                 P{i + 1} <span className="opacity-60">({pts})</span>
               </label>
               <select
@@ -119,18 +196,46 @@ function SessionPicker({ round, kind, season }: { round: number; kind: SessionKi
                 value={order?.[i] ?? ''}
                 onChange={(e) => setSlot(round, kind, i, e.target.value || null)}
                 aria-label={`Round ${round} ${label} P${i + 1}`}
+                style={driver ? { borderLeft: `4px solid ${teamColor(driver.constructorId)}` } : undefined}
               >
                 <option value="">— DNF / none</option>
                 {drivers.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.code} · {d.name}
+                    {d.code} · {d.name.split(' ').at(-1)}
                     {order?.includes(d.id) && order[i] !== d.id ? ` (P${order.indexOf(d.id) + 1})` : ''}
                   </option>
                 ))}
               </select>
-            </div>
+            </li>
           );
         })}
+      </ol>
+      <div
+        className={`mt-2 rounded border border-dashed border-zinc-300 p-2 dark:border-zinc-700 ${ring('pool')}`}
+        onDragOver={(e) => dragOver(e, 'pool')}
+        onDragLeave={() => setOver(null)}
+        onDrop={dropOnPool}
+      >
+        <p className="mb-1 text-xs opacity-70">Not placed (0 pts): drag onto a position</p>
+        {unplaced.length === 0 ? (
+          <p className="text-xs italic opacity-60">Everyone is placed.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-1.5">
+            {unplaced.map((d) => (
+              <li
+                key={d.id}
+                draggable
+                onDragStart={(e) => startDrag(e, -1, d.id)}
+                onDragEnd={() => setOver(null)}
+                title={d.name}
+                className="cursor-grab rounded border border-zinc-300 bg-white px-1.5 py-0.5 text-xs font-medium select-none dark:border-zinc-700 dark:bg-zinc-950"
+                style={{ borderLeft: `4px solid ${teamColor(d.constructorId)}` }}
+              >
+                {d.code}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </fieldset>
   );

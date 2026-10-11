@@ -36,6 +36,8 @@ export interface Projection {
   clinch: Record<Mode, ClinchInfo | null>;
   /** True if summed results disagree with the official standings (e.g. a post-race penalty). */
   mismatch: boolean;
+  /** Last session the standings include (actual or predicted); null before the season starts. */
+  asOf: { round: number; kind: 'race' | 'sprint'; predicted: boolean } | null;
 }
 
 export function teamMap(season: SeasonData): Record<string, string> {
@@ -100,7 +102,57 @@ export function project(season: SeasonData, predictions: Predictions): Projectio
     rows: { driver: d.rows, constructor: c.rows },
     clinch: { driver: d.clinch, constructor: c.clinch },
     mismatch,
+    asOf: lastSession([...season.sessions, ...predicted]),
   };
+}
+
+function lastSession(sessions: Session[]): Projection['asOf'] {
+  // A weekend's race comes after its sprint.
+  const order = (s: Session) => s.round * 2 + (s.kind === 'race' ? 1 : 0);
+  const last = sessions.reduce<Session | undefined>((acc, s) => (!acc || order(s) > order(acc) ? s : acc), undefined);
+  return last ? { round: last.round, kind: last.kind, predicted: sessions.some((s) => s.predicted) } : null;
+}
+
+// ---------- Predictor quick-fill ----------
+
+/** Current championship order, limited to the current grid (drivers in the latest session). */
+export function standingsOrder(season: SeasonData, size: number): (string | null)[] {
+  const grid = new Set(season.entrants);
+  return currentStandings(season, 'driver')
+    .map((s) => s.id)
+    .filter((id) => grid.has(id))
+    .slice(0, size);
+}
+
+/**
+ * Order of the latest earlier session of the same kind: the user's prediction if they made one (copied
+ * slot for slot), otherwise the actual result (classified finishers on the current grid, in order).
+ * null if there is no earlier session of that kind.
+ */
+export function previousOrder(
+  season: SeasonData,
+  predictions: Predictions,
+  round: number,
+  kind: 'race' | 'sprint',
+  size: number,
+): (string | null)[] | null {
+  const grid = new Set(season.entrants);
+  const predicted = predictionsToSessions(predictions, season.schedule, teamMap(season));
+  const earlier = [...season.sessions, ...predicted]
+    .filter((s) => s.kind === kind && s.round < round)
+    .sort((a, b) => a.round - b.round)
+    .at(-1);
+  if (!earlier) return null;
+  if (earlier.predicted) {
+    const order: (string | null)[] = Array.from({ length: size }, () => null);
+    for (const f of earlier.finishes) if (f.position !== null) order[f.position - 1] = f.driverId;
+    return order;
+  }
+  return earlier.finishes
+    .filter((f): f is typeof f & { position: number } => f.position !== null && grid.has(f.driverId))
+    .sort((a, b) => a.position - b.position)
+    .map((f) => f.driverId)
+    .slice(0, size);
 }
 
 // ---------- Chart series ----------

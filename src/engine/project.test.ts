@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartData, LEADER, PRED, project } from './project';
+import { chartData, LEADER, PRED, previousOrder, project, standingsOrder } from './project';
 import type { SeasonData, Session } from './types';
 
 const race = (round: number, order: [string, string][], predicted = false): Session => ({
@@ -81,11 +81,16 @@ describe('project', () => {
       ['grey', 'grey', 'grey'],
     ]);
     expect(p.clinch.driver?.next).toEqual({ round: 2, kind: 'race' });
+    // Round 2's sprint is the latest session run.
+    expect(p.asOf).toEqual({ round: 2, kind: 'sprint', predicted: false });
+    // Order of the input doesn't matter.
+    expect(project({ ...season, sessions: [...season.sessions].reverse() }, {}).asOf).toEqual(p.asOf);
   });
 
   it('applies predictions, marks those sessions done and reports predicted points', () => {
     const p = project(season, { '2:race': ['ann', 'bob'], '3:race': ['ann', 'cat'] });
     expect(p.schedule.every((w) => w.raceDone)).toBe(true);
+    expect(p.asOf).toEqual({ round: 3, kind: 'race', predicted: true });
     expect(p.rows.driver[0]).toMatchObject({ id: 'ann', points: 75, predictedPoints: 50, status: 'Champion' });
     expect(p.rows.constructor[0]).toMatchObject({ id: 'red', points: 108, status: 'Champion' });
     expect(p.clinch.driver).toMatchObject({ clinched: true });
@@ -103,6 +108,7 @@ describe('project', () => {
     const p = project(empty, {});
     expect(p.rows.driver).toEqual([]);
     expect(p.clinch.driver).toBeNull();
+    expect(p.asOf).toBeNull();
   });
 });
 
@@ -150,5 +156,34 @@ describe('chartData', () => {
     expect(c.maxAchievable[1]?.[LEADER]).toBe(25);
     const none = chartData(pre, [{ round: 1, kind: 'race', finishes: [], predicted: true }], 'driver', []);
     expect(none.maxAchievable[0]?.[LEADER]).toBe(0);
+  });
+});
+
+describe('predictor quick-fill', () => {
+  it('standings order skips drivers not on the current grid', () => {
+    // dan is in the standings but not an entrant.
+    expect(standingsOrder(season, 10)).toEqual(['bob', 'ann', 'cat']);
+    expect(standingsOrder(season, 2)).toEqual(['bob', 'ann']);
+  });
+
+  it('previous race: actual result when nothing earlier is predicted, classified grid drivers only', () => {
+    const withGhost: SeasonData = {
+      ...season,
+      sessions: [race(1, [['ann', 'red'], ['ghost', 'red'], ['bob', 'blue']]), ...season.sessions.slice(1)],
+    };
+    expect(previousOrder(withGhost, {}, 2, 'race', 10)).toEqual(['ann', 'bob']);
+    // Sprint at round 2: the DNF (ann) is left out.
+    expect(previousOrder(season, {}, 3, 'sprint', 8)).toEqual(['bob']);
+  });
+
+  it('previous race: copies an earlier prediction slot for slot, gaps included', () => {
+    expect(previousOrder(season, { '2:race': ['cat', null, 'ann'] }, 3, 'race', 10)).toEqual([
+      'cat', null, 'ann', null, null, null, null, null, null, null,
+    ]);
+  });
+
+  it('is null when there is no earlier session of that kind', () => {
+    expect(previousOrder(season, {}, 1, 'race', 10)).toBeNull();
+    expect(previousOrder(season, {}, 2, 'sprint', 8)).toBeNull();
   });
 });

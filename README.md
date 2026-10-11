@@ -58,7 +58,7 @@ src/
 - **Minimum result to clinch:** the worst position in the *next session* that still clinches, assuming every rival gets their best result in that session. The next session is the sprint if one is pending. For constructors the app only answers "would a 1-2 clinch it?", because "minimum two-car result" has no single natural ordering.
 - **"Needs X points":** X is the gap +1, or just the gap if a tie would go their way on countback.
 - **Title scenarios** ("leader scores 0" / "leader P2 every time"): the worst position the driver needs in *every* remaining race and sprint to finish ahead of the leader. If the selected driver is the leader, the rival is P2. Other drivers are ignored.
-- **Predictions:** dropdowns per points position (P1–P10 race, P1–P8 sprint), not drag-and-drop. Duplicates are impossible: picking a driver who is already placed moves them. Anyone not placed is a DNF / outside the points (0 pts). A session counts as predicted, and stops counting as remaining, as soon as one slot is filled.
+- **Predictions:** each points position (P1–P10 race, P1–P8 sprint) can be filled by dragging a driver from the "not placed" pool or by its dropdown. Dragging one position onto another swaps them; dragging back to the pool removes the driver. Quick-fill buttons per session: *Current standings* (championship order, current grid only), *Previous race/sprint* (your earlier prediction if you made one, otherwise the actual result), and *Clear*. Duplicates are impossible: placing a driver who is already placed moves them. Anyone not placed is a DNF / outside the points (0 pts). A session counts as predicted, and stops counting as remaining, as soon as one slot is filled.
 - **Dark mode** follows the OS setting (`prefers-color-scheme`); there is no manual toggle.
 - **Line charts** show the top 8 drivers by projected points to stay readable. All constructors are shown.
 
@@ -67,6 +67,7 @@ src/
 - Predicted sessions only fill the points positions. Countback for predicted rounds therefore ignores P11 and below, which matters only for extremely deep ties.
 - Half points or shortened-race rules aren't applied to predictions; predictions always use full points.
 - Penalties applied after a race appear in totals (from the standings endpoints) but not in the progression charts (from results). A banner flags the mismatch.
+- Drag and drop uses the browser's native HTML5 drag and drop, which some mobile browsers support poorly. On touch devices the dropdowns and quick-fill buttons do the same job.
 - Teammates share a team colour. The second car gets a shaded variant, and every chart has a data table, so identity never depends on colour alone.
 - The JS bundle is ~780 kB minified (233 kB gzipped), mostly Recharts; it is not code-split.
 - Team colours are hardcoded per `constructorId`. A new team gets a stable fallback colour until it is added to `teamColors.ts`.

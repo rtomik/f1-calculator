@@ -3,6 +3,7 @@ import {
   addResult,
   applyPredictions,
   assignSlot,
+  swapSlots,
   bestCase,
   canClinch,
   compareStandings,
@@ -376,5 +377,12 @@ describe('titleScenarios', () => {
   });
   it('has no scenarios without a rival', () => {
     expect(titleScenarios('a', [st('a', 10)], sched)).toMatchObject({ rival: null, scenarios: [] });
+  });
+});
+
+describe('swapSlots', () => {
+  it('swaps two positions, including with an empty slot, padded to the session size', () => {
+    expect(swapSlots(['a', 'b', 'c'], 0, 2, 3)).toEqual(['c', 'b', 'a']);
+    expect(swapSlots(['a'], 0, 2, 3)).toEqual([null, null, 'a']);
   });
 });

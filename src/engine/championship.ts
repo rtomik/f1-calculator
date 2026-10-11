@@ -287,3 +287,8 @@ export function assignSlot(order: (string | null)[], index: number, driverId: st
   next[index] = driverId;
   return next;
 }
+
+/** Swaps two predictor slots (dragging one position onto another). */
+export function swapSlots(order: (string | null)[], a: number, b: number, size: number): (string | null)[] {
+  return Array.from({ length: size }, (_, i) => order[i === a ? b : i === b ? a : i] ?? null);
+}

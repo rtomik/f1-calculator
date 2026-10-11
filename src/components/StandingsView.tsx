@@ -15,8 +15,14 @@ export function StandingsView({ projection }: { projection: Projection }) {
         </p>
       )}
       <div className="grid gap-4 lg:grid-cols-[3fr_2fr]">
-        <StandingsTable title="Drivers" mode="driver" rows={projection.rows.driver} clinch={projection.clinch.driver} />
-        <StandingsTable title="Constructors" mode="constructor" rows={projection.rows.constructor} clinch={projection.clinch.constructor} />
+        <StandingsTable title="Drivers" mode="driver" rows={projection.rows.driver} clinch={projection.clinch.driver} asOf={projection.asOf} />
+        <StandingsTable
+          title="Constructors"
+          mode="constructor"
+          rows={projection.rows.constructor}
+          clinch={projection.clinch.constructor}
+          asOf={projection.asOf}
+        />
       </div>
     </div>
   );
@@ -25,7 +31,7 @@ export function StandingsView({ projection }: { projection: Projection }) {
 function clinchSummary(leader: TableRow, clinch: ClinchInfo | null, mode: Mode): string | null {
   if (!clinch || clinch.clinched || !clinch.next) return null;
   const where = `round ${clinch.next.round} ${clinch.next.kind}`;
-  if (!clinch.canClinchNext) return `${leader.name} cannot clinch at the ${where}.`;
+  if (!clinch.canClinchNext) return null;
   if (mode === 'constructor') return `${leader.name} can clinch at the ${where} with a 1-2.`;
   const p = clinch.minPosition;
   return p !== null && p > POINTS[clinch.next.kind].length
@@ -33,7 +39,25 @@ function clinchSummary(leader: TableRow, clinch: ClinchInfo | null, mode: Mode):
     : `${leader.name} clinches at the ${where} by finishing P${p} or better, even if every rival scores the maximum.`;
 }
 
-function StandingsTable({ title, mode, rows, clinch }: { title: string; mode: Mode; rows: TableRow[]; clinch: ClinchInfo | null }) {
+function asOfText(asOf: Projection['asOf']): string | null {
+  if (!asOf) return null;
+  const session = `R${asOf.round}${asOf.kind === 'sprint' ? ' sprint' : ''}`;
+  return asOf.predicted ? `Projected points after ${session} (includes your predictions)` : `Points after ${session}`;
+}
+
+function StandingsTable({
+  title,
+  mode,
+  rows,
+  clinch,
+  asOf,
+}: {
+  title: string;
+  mode: Mode;
+  rows: TableRow[];
+  clinch: ClinchInfo | null;
+  asOf: Projection['asOf'];
+}) {
   const leader = rows[0];
   const summary = leader ? clinchSummary(leader, clinch, mode) : null;
   return (
@@ -41,7 +65,9 @@ function StandingsTable({ title, mode, rows, clinch }: { title: string; mode: Mo
       <h2 id={`h-${mode}`} className="mb-2 text-lg font-semibold">
         {title}
       </h2>
-      {summary && <p className="mb-2 text-sm opacity-80">{summary}</p>}
+      {rows.length > 0 && asOfText(asOf) && <p className={`text-sm opacity-80 ${asOf?.predicted ? 'italic' : ''}`}>{asOfText(asOf)}</p>}
+      {summary && <p className="mt-1 text-sm font-medium">{summary}</p>}
+      <div className="mb-2" />
       {rows.length === 0 ? (
         <EmptyState title="No standings yet">Standings appear after the first session of the season.</EmptyState>
       ) : (
