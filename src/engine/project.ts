@@ -141,12 +141,15 @@ function roundStates(season: SeasonData, predicted: Session[], mode: Mode): Roun
 /** Splits per-round values into actual and predicted keys so charts can draw solid vs dashed lines. */
 function split(states: RoundState[], ids: string[], value: (st: RoundState, id: string) => number): SeriesRow[] {
   const lastActual = states.reduce((acc, st, i) => (st.predicted ? acc : i), -1);
+  // The predicted series starts at the last actual round so the dashed line joins the solid one,
+  // but only when there is something predicted after it.
+  const firstPred = states.some((st) => st.predicted) ? Math.max(lastActual, 0) : states.length;
   return states.map((st, i) => {
     const row: SeriesRow = { round: st.round, label: `R${st.round}`, name: st.name, predicted: st.predicted };
     for (const id of ids) {
       const v = value(st, id);
       if (i <= lastActual) row[id] = v;
-      if (i >= lastActual) row[id + PRED] = v;
+      if (i >= firstPred) row[id + PRED] = v;
     }
     return row;
   });

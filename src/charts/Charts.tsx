@@ -10,6 +10,8 @@ import {
   ResponsiveContainer,
   Tooltip,
   XAxis,
+  type TooltipContentProps,
+  type TooltipValueType,
   YAxis,
 } from 'recharts';
 import { chartData, LEADER, PRED, type Projection, type SeriesRow, type TableRow } from '../engine/project';
@@ -129,14 +131,7 @@ function LineFrame({
           {firstPred && lastPred && (
             <ReferenceArea x1={firstPred.label} x2={lastPred.label} fill="#8b5cf6" fillOpacity={0.12} />
           )}
-          <Tooltip
-            contentStyle={tooltipStyle}
-            labelFormatter={(label, payload) => {
-              const row = payload[0]?.payload as SeriesRow | undefined;
-              return row ? `${label} · ${row.name}${row.predicted ? ' (predicted)' : ''}` : String(label);
-            }}
-            formatter={(value) => (typeof value === 'number' ? fmt(value) : String(value))}
-          />
+          <Tooltip content={SeriesTooltip} />
           <Legend wrapperStyle={{ fontSize: 12 }} formatter={legendText} />
           {leader && <Line dataKey={LEADER} name="Leader's points" stroke="var(--leader)" strokeWidth={3} dot={false} isAnimationActive={false} />}
           {shown.map((r) => (
@@ -158,6 +153,35 @@ function LineFrame({
         </LineChart>
       </ResponsiveContainer>
     </ChartFrame>
+  );
+}
+
+/**
+ * One entry per competitor. At the hand-over round both the actual and the predicted series hold the
+ * same value, so show the actual one on actual rounds and the predicted one on predicted rounds.
+ */
+function SeriesTooltip({ active, payload, label }: TooltipContentProps<TooltipValueType, string | number>) {
+  const row = payload?.[0]?.payload as SeriesRow | undefined;
+  if (!active || !row) return null;
+  const items = payload
+    .filter((p) => typeof p.value === 'number' && String(p.dataKey).endsWith(PRED) === row.predicted)
+    .sort((a, b) => Number(b.value) - Number(a.value));
+  return (
+    <div style={tooltipStyle} className="px-2 py-1.5">
+      <p className="mb-1 font-semibold">
+        {label} · {row.name}
+        {row.predicted && <span className="font-normal italic"> (predicted)</span>}
+      </p>
+      <ul>
+        {items.map((p) => (
+          <li key={String(p.dataKey)} className="flex items-center gap-2">
+            <span aria-hidden="true" className="h-0.5 w-3" style={{ background: p.color }} />
+            <span className="flex-1">{String(p.name).replace(' (predicted)', '')}</span>
+            <span className="tabular-nums">{fmt(Number(p.value))}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 

@@ -128,6 +128,8 @@ describe('chartData', () => {
 
   it('computes max achievable points and the elimination round', () => {
     const c = chartData(season, [], 'driver', ['ann', 'cat']);
+    // No predictions: no predicted series at all, not even at the last round.
+    expect(c.progression.some((r) => Object.keys(r).some((k) => k.endsWith(PRED)))).toBe(false);
     // After R1: ann 25 + (25 race + 8 sprint + 25 race) = 83; leader line = 25.
     expect(c.maxAchievable[0]).toMatchObject({ ann: 83, [LEADER]: 25 });
     expect(c.eliminatedAfter).toEqual({ ann: null, cat: null });
