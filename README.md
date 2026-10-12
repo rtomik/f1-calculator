@@ -4,6 +4,8 @@ Live F1 standings, a session-only race predictor, and title maths: who's still i
 
 React + Vite + TypeScript (strict) · TanStack Query · Zustand · Recharts · Tailwind v4 · Zod · Vitest. Static build, no backend.
 
+https://rtomik.github.io/f1-calculator/
+
 ## Setup
 
 ```bash
